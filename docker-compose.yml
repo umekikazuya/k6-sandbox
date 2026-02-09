@@ -1,0 +1,18 @@
+services:
+  mock-server:
+    build:
+      context: ./mock-server
+      dockerfile: Dockerfile
+    container_name: k6-sandbox-mock-server
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    restart: unless-stopped
+    networks:
+      - k6-sandbox
+
+networks:
+  k6-sandbox:
+    driver: bridge
