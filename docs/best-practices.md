@@ -35,23 +35,23 @@
 // デプロイ前 → Smoke Test
 export const options = {
   vus: 1,
-  duration: '1m',
+  duration: "1m",
 };
 
 // 通常運用の検証 → Load Test
 export const options = {
   stages: [
-    { duration: '2m', target: 50 },
-    { duration: '5m', target: 50 },
+    { duration: "2m", target: 50 },
+    { duration: "5m", target: 50 },
   ],
 };
 
 // 限界値の確認 → Stress Test
 export const options = {
   stages: [
-    { duration: '2m', target: 100 },
-    { duration: '5m', target: 100 },
-    { duration: '2m', target: 200 },
+    { duration: "2m", target: 100 },
+    { duration: "5m", target: 100 },
+    { duration: "2m", target: 200 },
   ],
 };
 ```
@@ -63,10 +63,10 @@ export const options = {
 export default function () {
   http.get(`${BASE_URL}/products`);
   sleep(2); // ユーザーが商品を眺める時間
-  
+
   http.get(`${BASE_URL}/products/1`);
   sleep(5); // 商品詳細を読む時間
-  
+
   http.post(`${BASE_URL}/cart`, payload);
   sleep(1);
 }
@@ -87,11 +87,11 @@ export default function () {
 
 ```javascript
 // ✅ Good: 環境変数を使用
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
 const VUS = parseInt(__ENV.VUS) || 10;
 
 // ❌ Bad: ハードコード
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = "http://localhost:3000";
 const VUS = 10;
 ```
 
@@ -102,7 +102,9 @@ const VUS = 10;
 const response = http.post(url, payload);
 
 if (response.status !== 201) {
-  console.error(`Failed to create: status=${response.status}, body=${response.body}`);
+  console.error(
+    `Failed to create: status=${response.status}, body=${response.body}`,
+  );
   return; // 後続処理をスキップ
 }
 
@@ -110,7 +112,7 @@ try {
   const data = JSON.parse(response.body);
   // データ処理
 } catch (e) {
-  console.error('JSON parse error:', e);
+  console.error("JSON parse error:", e);
 }
 
 // ❌ Bad: エラーを無視
@@ -144,17 +146,17 @@ export default function () {
 ```javascript
 // ✅ Good: 具体的で意味のあるチェック
 check(response, {
-  'ログイン成功（200）': (r) => r.status === 200,
-  'トークンが取得できた': (r) => {
+  "ログイン成功（200）": (r) => r.status === 200,
+  トークンが取得できた: (r) => {
     const body = JSON.parse(r.body);
     return body.data && body.data.token;
   },
-  'レスポンスタイムが許容範囲': (r) => r.timings.duration < 500,
+  レスポンスタイムが許容範囲: (r) => r.timings.duration < 500,
 });
 
 // ❌ Bad: 曖昧なチェック
 check(response, {
-  'success': (r) => r.status === 200,
+  success: (r) => r.status === 200,
 });
 ```
 
@@ -184,14 +186,14 @@ thresholds: {
 
 ```javascript
 // ✅ Good: ビジネス指標を測定
-import { Counter, Rate } from 'k6/metrics';
+import { Counter, Rate } from "k6/metrics";
 
-const purchaseAttempts = new Counter('purchase_attempts');
-const purchaseSuccess = new Rate('purchase_success_rate');
+const purchaseAttempts = new Counter("purchase_attempts");
+const purchaseSuccess = new Rate("purchase_success_rate");
 
 export default function () {
   purchaseAttempts.add(1);
-  const response = http.post('/checkout', payload);
+  const response = http.post("/checkout", payload);
   purchaseSuccess.add(response.status === 201);
 }
 
@@ -225,9 +227,9 @@ thresholds: {
 ```javascript
 // ✅ Good: 並列実行で高速化
 const responses = http.batch([
-  ['GET', `${BASE_URL}/api/users`],
-  ['GET', `${BASE_URL}/api/products`],
-  ['GET', `${BASE_URL}/api/orders`],
+  ["GET", `${BASE_URL}/api/users`],
+  ["GET", `${BASE_URL}/api/products`],
+  ["GET", `${BASE_URL}/api/orders`],
 ]);
 
 // ❌ Bad: 順次実行（遅い）
@@ -240,14 +242,14 @@ http.get(`${BASE_URL}/api/orders`);
 
 ```javascript
 // ✅ Good: SharedArrayで1回だけロード
-import { SharedArray } from 'k6/data';
+import { SharedArray } from "k6/data";
 
-const users = new SharedArray('users', function () {
-  return JSON.parse(open('./users.json'));
+const users = new SharedArray("users", function () {
+  return JSON.parse(open("./users.json"));
 });
 
 // ❌ Bad: 各VUで個別にロード（メモリ大量消費）
-const users = JSON.parse(open('./users.json'));
+const users = JSON.parse(open("./users.json"));
 ```
 
 ### ✅ 不要なログを削減
@@ -272,15 +274,15 @@ console.log(`Status: ${response.status}, Body: ${response.body}`);
 // ✅ Good: 2-3分で完了
 export const options = {
   stages: [
-    { duration: '30s', target: 10 },
-    { duration: '1m', target: 10 },
-    { duration: '30s', target: 0 },
+    { duration: "30s", target: 10 },
+    { duration: "1m", target: 10 },
+    { duration: "30s", target: 0 },
   ],
 };
 
 // ❌ Bad: 長すぎる（CI/CDの待ち時間が増える）
 export const options = {
-  duration: '30m',
+  duration: "30m",
 };
 ```
 
@@ -290,24 +292,24 @@ export const options = {
 // Step 1: 監視のみ（閾値なし）
 export const options = {
   vus: 10,
-  duration: '1m',
+  duration: "1m",
 };
 
 // Step 2: 緩い閾値
 export const options = {
   vus: 10,
-  duration: '1m',
+  duration: "1m",
   thresholds: {
-    http_req_duration: ['p(95)<1000'], // 警告レベル
+    http_req_duration: ["p(95)<1000"], // 警告レベル
   },
 };
 
 // Step 3: 厳しい閾値
 export const options = {
   vus: 10,
-  duration: '1m',
+  duration: "1m",
   thresholds: {
-    http_req_duration: ['p(95)<500'], // 本番レベル
+    http_req_duration: ["p(95)<500"], // 本番レベル
   },
 };
 ```
@@ -339,18 +341,18 @@ export const options = {
 ```javascript
 /**
  * 購入フローの負荷テスト
- * 
+ *
  * 目的: 決済処理が高負荷時も正常に動作することを確認
  * 対象: POST /api/checkout
- * 
+ *
  * 実行方法:
  *   k6 run --vus 50 --duration 5m checkout-test.js
- * 
+ *
  * 基準:
  *   - p(95) < 1000ms
  *   - エラー率 < 1%
  *   - 決済成功率 > 99%
- * 
+ *
  * 注意:
  *   - 本番環境では実行しないこと
  *   - テスト用のクレジットカード番号を使用
@@ -363,8 +365,8 @@ export const options = {
 # GitHub Actions - 定期実行
 on:
   schedule:
-    - cron: '0 3 * * *'  # 毎日午前3時
-    - cron: '0 12 * * 1' # 毎週月曜日正午
+    - cron: "0 3 * * *" # 毎日午前3時
+    - cron: "0 12 * * 1" # 毎週月曜日正午
 ```
 
 ### ✅ 結果を共有
@@ -396,7 +398,7 @@ k6 run script.js > results-v2.json
 // 危険！本番データが壊れる可能性
 export const options = {
   vus: 1000,
-  duration: '1h',
+  duration: "1h",
 };
 
 // 本番環境では:
@@ -418,9 +420,9 @@ export default function () {
 export default function () {
   const res = http.post('/users', generateUser());
   const userId = JSON.parse(res.body).id;
-  
+
   // テスト実行
-  
+
   http.del(`/users/${userId}`); // クリーンアップ
 }
 ```
