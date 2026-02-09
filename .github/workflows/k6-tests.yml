@@ -1,0 +1,133 @@
+name: k6 Load Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # 毎日午前3時（UTC）に実行
+    - cron: '0 3 * * *'
+  workflow_dispatch: # 手動実行を許可
+
+jobs:
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Docker Compose
+        run: |
+          docker compose up -d mock-server
+          sleep 10
+          curl http://localhost:3000/health || exit 1
+      
+      - name: Run k6 smoke test
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: scenarios/02-load-patterns/01-smoke-test.js
+        env:
+          BASE_URL: http://localhost:3000
+      
+      - name: Cleanup
+        if: always()
+        run: docker compose down
+
+  load-test:
+    name: Load Test
+    runs-on: ubuntu-latest
+    needs: smoke-test
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Docker Compose
+        run: |
+          docker compose up -d mock-server
+          sleep 10
+      
+      - name: Run k6 load test
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: scenarios/05-cicd/01-threshold-validation.js
+        env:
+          ENVIRONMENT: staging
+          BASE_URL: http://localhost:3000
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: k6-load-test-results-${{ github.run_number }}
+          path: |
+            summary.json
+            summary.html
+      
+      - name: Cleanup
+        if: always()
+        run: docker compose down
+
+  comment-pr:
+    name: Comment on PR
+    runs-on: ubuntu-latest
+    needs: load-test
+    if: github.event_name == 'pull_request' && always()
+    
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v3
+        with:
+          name: k6-load-test-results-${{ github.run_number }}
+      
+      - name: Comment PR with results
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const summary = JSON.parse(fs.readFileSync('summary.json', 'utf8'));
+              
+              const metrics = summary.metrics;
+              const totalReqs = metrics.http_reqs?.values.count || 0;
+              const failRate = ((metrics.http_req_failed?.values.rate || 0) * 100).toFixed(2);
+              const p95 = metrics.http_req_duration?.values['p(95)']?.toFixed(2) || 'N/A';
+              const avg = metrics.http_req_duration?.values.avg?.toFixed(2) || 'N/A';
+              
+              const thresholdsPassed = Object.entries(metrics)
+                .filter(([key, value]) => value.thresholds)
+                .every(([key, value]) => Object.values(value.thresholds).every(t => t.ok));
+              
+              const status = thresholdsPassed ? '✅ PASSED' : '❌ FAILED';
+              
+              const comment = `## ${status} k6 Load Test Results
+              
+              | Metric | Value |
+              |--------|-------|
+              | Total Requests | ${totalReqs} |
+              | Failed Requests | ${failRate}% |
+              | Avg Response Time | ${avg}ms |
+              | P95 Response Time | ${p95}ms |
+              
+              <details>
+              <summary>View detailed results</summary>
+              
+              Download the full HTML report from the workflow artifacts.
+              
+              </details>
+              `;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.error('Error reading summary:', error);
+            }
